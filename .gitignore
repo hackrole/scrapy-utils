@@ -1,0 +1,11 @@
+*.pyc
+/scrapy/caches/*
+!/scrapy/caches/.emtpy.cache
+/scrapy/logs/*
+!/scrapy/caches/,emtpy.log
+/scrapy/exportes/*
+!/scrapy/exportes/.emtpy.json
+/scrapy/schemas/*
+!/scrapy/schemas/.emtpy.sql
+*.log
+*.bak
