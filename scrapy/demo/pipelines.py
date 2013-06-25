@@ -17,6 +17,41 @@ class MongoSavePipeline(object):
 
         return item
 
+class SqlSave2Pipeline(object):
+    """ save the item to mysql db """
+
+    def __init__(self, db, host="localhost", user="root",
+            passwd="root", charset="utf8", db_driven="mysql"):
+        self.db = db
+        self.host = host
+        self.user = user
+        self.passwd = passwd
+        self.db_driven = db_driven
+        mysql_url = URL(db_driven, username=user, password=passwd,
+                host=host, database=db, query={'charset':charset,})
+        engine = create_engine(mysql_url, echo=True)
+        self.engine = engine
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        settings = crawler.settings
+        host = settings.get('DB_HOST', 'localhost')
+        user = settings.get('DB_USER', 'root')
+        passwd = settings.get('DB_PASSWD', 'root')
+        db = settings.get('DB_DB', 'ssc')
+        charset = settings.get('DB_CHAR', 'utf8')
+        db_driven = settings.get('DB_DRIVEN', 'mysql')
+        return cls(db, host, user, passwd, charset, db_driven)
+
+    def process_item(self, item, spider):
+        key = ','.join(item.keys())
+        value = item.values()
+        s = ",".join(['%s' for i in value])
+        tb_name = item.tablename()
+        sql = "insert into %s (%s) values (%s)" % (tb_name, key, s)
+        self.engine.execute(sql, value)
+        print "sql save"
+
 class MongoSave2Pipeline(object):
     """save the item to mongo db, use extension"""
 
