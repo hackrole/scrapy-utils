@@ -1,0 +1,177 @@
+#coding=utf8
+#!/usr/bin/env python
+"""
+这个spider是查询-翻页-进详情页模式的基础spider类.
+使用scrapy
+如果你使用scrapy+selenium,请注意适配,或使用另一个基础spider类
+"""
+from __future__ import division, print_function, unicode_literals
+
+__metaclass__ = type
+
+#Author:wuya @ smallteam
+#Date: 13-5-13
+import json
+from bson import ObjectId
+
+from mechanize import LinkNotFoundError
+
+from scrapy.http import Request
+from scrapy import log
+
+from feet8.utils.multi_convert import request_mechanize2scrapy, response_scrapy2mechanize
+from feet8.cells.spider_item_mixin import SpiderItemMixin
+from feet8.cells.spider_common_mixin import SpiderCommonMixin
+from feet8.cells.query_spider import QuerySpider
+
+class LegSpider(QuerySpider, SpiderCommonMixin, SpiderItemMixin,):
+    name = 'leg'
+
+    #querys and page limit
+    querys = []
+    page_count_limit = 0
+    entry_url = ''
+    search_form_order = 0
+    search_input_name = ''
+    next_page_word = ''
+    visit_detail = False
+
+    #from SpiderCommonMixin
+    #custom_settings
+    custom_settings = {}
+    #from SpiderItemMixin
+    #使用这个编码当不能检测编码或需要预制编码时
+    _site_default_encoding = None
+    #spider kwargs
+
+    def __init__(self, *args, **kwargs):
+        super(LegSpider, self).__init__(*args, **kwargs)
+
+    def get_next_page_link(self):
+        return None
+
+    def init(self):
+        """
+        环境初始化:类似登录
+        由子类根据情况自己选择如何实现
+        可考虑阻塞实现,也可考虑scrapy本身实现.
+        具体-.-注意可能需要同步cookie之类
+        """
+        pass
+
+    def init_callback(self, response):
+        pass
+
+    def get_entry_request(self, query):
+        entry_request = Request(self.entry_url, callback=self.entry_callback)
+        entry_request.meta['query'] = query
+        return entry_request
+
+    def entry_callback(self, response):
+        query = response.meta['query']
+        scrapy_request = self.get_query_request(response)
+        scrapy_request.meta['query'] = query
+        scrapy_request.meta['page_num'] = 1
+        if not scrapy_request.callback:
+            scrapy_request.callback = self.query_callback
+        yield scrapy_request
+
+    def get_query_request(self, response):
+        # noinspection PyPropertyAccess
+        br = self.br
+        mechanize_response = response_scrapy2mechanize(response)
+        br.set_response(mechanize_response)
+        br.select_form(nr=self.search_form_order)
+        query = response.meta['query']
+        encoding = response.encoding
+        query = query.encode(encoding)
+        search_input_name = self.search_input_name.encode(encoding)
+        br[search_input_name] = query
+        query_request = br.click()
+        scrapy_request = request_mechanize2scrapy(query_request)
+        scrapy_request.callback = self.query_callback
+        return scrapy_request
+
+    def query_callback(self, response):
+        query = response.meta['query']
+        for item_or_request in self.parse_list_page(response):
+            yield item_or_request
+        page_num = response.meta.setdefault('page_num', 1)
+        self.log('%dth page' % page_num, level=log.INFO)
+        log.msg(format='query:%(query)s,page_num:%(page_num)d', query=repr(query), page_num=page_num, spider=self)
+        if page_num >= self.page_count_limit > 0:
+            self.log('reach page_count_limit %d' % self.page_count_limit, level=log.INFO)
+            yield None
+        else:
+            request = self.get_next_page_request(response)
+            if not request:
+                self.log('no more next page,page_num:%d' % page_num, level=log.INFO)
+                yield None
+            else:
+                if not request.callback:
+                    request.callback = self.query_callback
+                page_num += 1
+                request.meta['page_num'] = page_num
+                request.meta['query'] = query
+                yield request
+
+    def get_next_page_request(self, response):
+        # noinspection PyPropertyAccess
+        br = self.br
+        mechanize_response = response_scrapy2mechanize(response)
+        br.set_response(mechanize_response)
+        encoding = response.encoding
+        next_page_word = self.next_page_word.encode(encoding)
+        next_page_link = self.get_next_page_link()
+        # noinspection PyUnusedLocal
+        try:
+            if next_page_link:
+                next_page_request = br.click_link(link=next_page_link)
+            else:
+                next_page_request = br.click_link(text=next_page_word)
+            scrapy_request = request_mechanize2scrapy(next_page_request)
+            scrapy_request.callback = self.query_callback
+            return scrapy_request
+        except LinkNotFoundError as e:
+            return None
+        except Exception as e:
+            #到这里一般是解析到的链接是js的.
+            #已关键字监控这条日志
+            self.log('spider turn page error:%s' % e, level=log.INFO)
+            return None
+
+    def parse_list_page(self, response):
+        raise NotImplementedError
+
+    def parse_detail_page(self, response):
+        raise NotImplementedError
+
+    def item_or_request(self, item):
+        request = item.pop('next_request', None)
+        if request and self.visit_detail:
+            query = item['query']
+            request.meta['query'] = query
+            request.meta['item'] = item
+            return request
+        else:
+            return item
+
+    def start_requests(self):
+        init_result = self.init()
+        if isinstance(init_result, Request):
+            init_request = init_result
+            # noinspection PyUnresolvedReferences
+            init_request.callback = self.init_callback
+            yield init_request
+        if init_result is True:
+            pass
+        elif init_result is False:
+            raise Exception('init error')
+        for q in self.querys:
+            entry_request = self.get_entry_request(q)
+            if not entry_request.callback:
+                # noinspection PyUnresolvedReferences
+                entry_request.callback = self.entry_callback
+            # noinspection PyUnresolvedReferences
+            entry_request.dont_filter = True
+            yield entry_request

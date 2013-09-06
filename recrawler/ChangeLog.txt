@@ -1,0 +1,5 @@
+# recrawler changelog
+
+## 2013-07-19
+
+* First public version.

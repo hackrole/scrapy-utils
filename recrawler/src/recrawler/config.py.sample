@@ -1,0 +1,40 @@
+#!/usr/bin/python
+#coding = utf-8
+
+#queue mysql config
+QDB_USER = ''
+QDB_PASSWORD = ''
+QDB_HOST = 'localhost'
+QDB_DB = ''
+QDB_CHARSET = 'UTF8'
+
+#data mysql config
+DB_USER = ''
+DB_PASSWORD = ''
+DB_HOST = 'localhost'
+DB_DB = ''
+DB_CHARSET = 'UTF8'
+
+QUEUE = 'queue'
+QUEUE_FORMAT = 'queue_%s'
+
+#logger config
+LOG_NAME = 'en_news_site'
+BASIC_LOG_PATH = './log/'
+LOG_FILENAME = 'en_news_site'
+
+#redis config
+RHOST = '127.0.0.1'
+RPORT = 6379
+RDB = 0
+BITMAP = 'map'
+EXPIRE = 10
+QUEUE = 'queue'
+
+#gevent and requests config
+GPOOLSIZE = 10
+TIMEOUT = 5
+HEADERS = {}
+
+#worker config
+INTERVAL = 1

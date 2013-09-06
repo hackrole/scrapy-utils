@@ -1,0 +1,12 @@
+/.idea/
+*.pyc
+/feet8/build
+/feet8/disuse
+/feet8/mytest
+/feet8/mytest01
+/feet8/project.egg-info
+/feet8/testdata
+/feet8/tools
+*pyc
+bin/
+*pyo

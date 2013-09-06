@@ -1,0 +1,9 @@
+lxml
+ujson
+gevent
+murmur
+urlnorm
+requests
+cityhash
+mysql-python
+python-magic
